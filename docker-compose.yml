@@ -1,0 +1,36 @@
+services:
+
+  postgres:
+    image: postgres:17
+
+    container_name: postgres_db
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: fastapi
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  fastapi:
+
+    build: .
+
+    container_name: fastapi_app
+
+    restart: always
+
+    depends_on:
+      - postgres
+
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
