@@ -51,17 +51,17 @@ database_model.base.metadata.create_all(bind= engine)
 
 
 
-products = [
-    Product( name="Phone ", price=10.99, quantity=5),
-    Product( name="laptop ", price=19.99, quantity= 3),
-    Product( name="tablet ", price=5.99, quantity= 10),
-    Product( name="headphones ", price=2.99, quantity= 15),
-]
+# products = [
+#     Product( name="Phone ", original_price =10.99, quantity=5),
+#     Product( name="laptop ", original_price =19.99, quantity= 3),
+#     Product( name="tablet ", original_price =5.99, quantity= 10),
+#     Product( name="headphones ", original_price =2.99, quantity= 15),
+# ]
 
-customers = [
-    Customer( name="John Doe", mobile_number="1234567890", email="john.doe@example.com", address="123 Main St"),
-    Customer( name="Jane Smith", mobile_number="0987654321", email="jane.smith@example.com", address="456 Oak Ave"),
-]
+# customers = [
+#     Customer( name="John Doe", mobile_number="1234567890", email="john.doe@example.com", address="123 Main St"),
+#     Customer( name="Jane Smith", mobile_number="0987654321", email="jane.smith@example.com", address="456 Oak Ave"),
+# ]
 
 
 
@@ -103,6 +103,8 @@ def get_product_by_id(id:int , db: Session = Depends(get_db) , _: str = Depends(
 
 @app.post("/products/" , tags=["Products"] , summary="Add new product" , description="Add a new product to the database.")
 def add_product(product: Product, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    product_data = product.model_dump()
+    product_data["discounted_price "] = (product.original_price - (product.original_price * product.discount_percentage / 100 ))
     db.add(database_model.Product(**product.model_dump()))
     db.commit()
     return {"message": "Product added successfully!"}
@@ -112,7 +114,7 @@ def update_product(id:int , product: Product, db: Session = Depends(get_db), _: 
     db_product = db.query(database_model.Product).filter(database_model.Product.id == id).first()
     if db_product:
        db_product.name = product.name
-       db_product.price = product.price
+       db_product.original_price  = product.original_price 
        db_product.quantity = product.quantity
        db.commit()
        return {"message": "Product updated successfully!"}

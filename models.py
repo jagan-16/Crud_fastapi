@@ -4,8 +4,9 @@ from datetime import datetime
 
 class Product(BaseModel):
         name:str
-        price:float
+        original_price:float
         quantity:int
+        discount_percentage : int 
         
 
 class Customer(BaseModel):

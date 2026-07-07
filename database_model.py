@@ -28,8 +28,11 @@ class Product(base , TimestampMixin):
     
     id = Column (Integer, primary_key = True , index = True)
     name = Column (String , nullable = False)
-    price = Column (Float , nullable = False)
+    original_price = Column (Float , nullable = False)
     quantity = Column (Integer , nullable = False)
+    discount_percentage = Column(Float, nullable= True)
+    discounted_price = Column (Float, nullable= True )
+    
     
 
     order_items = relationship(
