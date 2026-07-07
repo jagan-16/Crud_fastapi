@@ -16,3 +16,7 @@ node_modules/
 
 # macOS
 .DS_Store
+
+README
+script.py.mako
+

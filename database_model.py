@@ -3,10 +3,26 @@ from sqlalchemy import Column ,Integer, Sequence , String , Float ,ForeignKey , 
 import uuid 
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime
+from datetime import datetime
 
 base = declarative_base()
 
-class Product(base):
+class TimestampMixin:
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+class Product(base , TimestampMixin):
     
     __tablename__ = "products"
     
@@ -14,13 +30,14 @@ class Product(base):
     name = Column (String , nullable = False)
     price = Column (Float , nullable = False)
     quantity = Column (Integer , nullable = False)
+    
 
     order_items = relationship(
         "OrderItem",
         back_populates="product"
     )
 
-class Customer(base):
+class Customer(base , TimestampMixin):
     __tablename__ = "customers"
     
     customer_id = Column (Integer ,
@@ -38,7 +55,7 @@ class Customer(base):
         back_populates="customer"
     )
     
-class Order(base):
+class Order(base ,TimestampMixin):
     __tablename__ = "orders"
     
     order_id = Column (UUID(as_uuid=True),
@@ -49,7 +66,6 @@ class Order(base):
     customer_id = Column(Integer,
                         ForeignKey("customers.customer_id"))
     
-    Date = Column(DateTime , nullable=False) 
     
     customer = relationship(
         "Customer",
@@ -61,7 +77,7 @@ class Order(base):
     )
     
     
-class OrderItem(base):
+class OrderItem(base , TimestampMixin):
     
     __tablename__ = "orderItem"
     

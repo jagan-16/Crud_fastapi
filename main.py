@@ -11,16 +11,16 @@ from fastapi import Security, HTTPException
 import os
 from dotenv import load_dotenv
 
-found = load_dotenv()
-print(found)
+load_dotenv()
+
 
 API_KEY = os.getenv("api_key")
-print ("checking api key" ,API_KEY)
+
 api_key_header = APIKeyHeader(
     name="x-api-key",
     auto_error=False
 )
-print("header_reading",api_key_header)
+
 def verify_api_key(
     api_key: str = Security(api_key_header)
 ):
@@ -151,7 +151,7 @@ def create_order(order: Order , db: Session = Depends(get_db), _: str = Depends(
     if customer is None:
         return {"message": "Customer not found!"}
     
-    db_order = database_model.Order(customer_id = order.customer_id , Date = datetime.utcnow())
+    db_order = database_model.Order(customer_id = order.customer_id , created_at = datetime.utcnow())
     
     db.add(db_order)
     db.flush()
@@ -179,7 +179,8 @@ def create_order(order: Order , db: Session = Depends(get_db), _: str = Depends(
 def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
    rows = (db.query(
         database_model.Order.customer_id,
-        database_model.Order.Date,
+        database_model.Order.created_at,
+        database_model.Order.updated_at ,
         database_model.Product.name,
         database_model.Product.id,
          database_model.Order.order_id,
@@ -207,7 +208,7 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
             orders[row.order_id] = OrderResponse(
                 customer_id=row.customer_id,
                 order_id=row.order_id,
-                order_date=row.Date,
+                order_date=row.created_at,
                 item=[]
             )
 
@@ -231,7 +232,7 @@ def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(v
             database_model.Product.name,
             database_model.Product.id ,
             database_model.Order.order_id,
-            database_model.Order.Date,
+            database_model.Order.created_at,
             database_model.OrderItem.order_item_id,
             database_model.OrderItem.quantity
         ).join(
@@ -245,7 +246,7 @@ def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(v
             return OrderResponse(
                 customer_id=db_order[0].customer_id,
                 order_id=db_order[0].order_id,
-                order_date=db_order[0].Date,
+                order_date=db_order[0].created_at,
                 item = [
                     OrderItemResponse(
                         product_id = row.id,
