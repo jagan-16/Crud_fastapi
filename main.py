@@ -51,17 +51,17 @@ database_model.base.metadata.create_all(bind= engine)
 
 
 
-# products = [
-#     Product( name="Phone ", original_price =10.99, quantity=5),
-#     Product( name="laptop ", original_price =19.99, quantity= 3),
-#     Product( name="tablet ", original_price =5.99, quantity= 10),
-#     Product( name="headphones ", original_price =2.99, quantity= 15),
-# ]
+products = [
+    Product( name="Phone ", original_price =10.99, quantity=5 , discount_percentage = 30),
+    Product( name="laptop ", original_price =19.99, quantity= 3 , discount_percentage = 30 ),
+    Product( name="tablet ", original_price =5.99, quantity= 10 , discount_percentage = 30 ),
+    Product( name="headphones ", original_price =2.99, quantity= 15 , discount_percentage = 30),
+]
 
-# customers = [
-#     Customer( name="John Doe", mobile_number="1234567890", email="john.doe@example.com", address="123 Main St"),
-#     Customer( name="Jane Smith", mobile_number="0987654321", email="jane.smith@example.com", address="456 Oak Ave"),
-# ]
+customers = [
+    Customer( name="John Doe", mobile_number="1234567890", email="john.doe@example.com", address="123 Main St"),
+    Customer( name="Jane Smith", mobile_number="0987654321", email="jane.smith@example.com", address="456 Oak Ave"),
+]
 
 
 
