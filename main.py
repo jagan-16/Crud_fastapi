@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import Depends , FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from uuid import UUID
-from models import Customer, Product, Order , OrderResponse, OrderItemResponse
+from models import Customer, Product, Order , OrderResponse, OrderItemResponse , productResponse , customerResponse , orderUpdate
 from database import session, engine
 import database_model
 from sqlalchemy.orm import Session
@@ -52,10 +52,10 @@ database_model.base.metadata.create_all(bind= engine)
 
 
 products = [
-    Product( name="Phone ", original_price =10.99, quantity=5 , discount_percentage = 30),
-    Product( name="laptop ", original_price =19.99, quantity= 3 , discount_percentage = 30 ),
-    Product( name="tablet ", original_price =5.99, quantity= 10 , discount_percentage = 30 ),
-    Product( name="headphones ", original_price =2.99, quantity= 15 , discount_percentage = 30),
+    Product( name="Phone ", original_price_per_unit =10.99,quantity = 5 , quantity_unit ="pcs" , discount_percentage_per_unit = 30),
+    Product( name="laptop ", original_price_per_unit =19.99, quantity= 3 ,quantity_unit ="pcs" , discount_percentage_per_unit = 30 ),
+    Product( name="tablet ", original_price_per_unit =5.99, quantity= 10 ,quantity_unit ="pcs" , discount_percentage_per_unit = 30 ),
+    Product( name="headphones ", original_price_per_unit =2.99, quantity= 15 ,quantity_unit ="pcs" , discount_percentage_per_unit = 30),
 ]
 
 customers = [
@@ -89,94 +89,290 @@ def init_db():
 
 init_db()
 
+
+def calculate_total_price(product, quantity):
+    return product.discounted_price_per_unit * quantity
+
+#get products
 @app.get("/products/" , tags=["Products"] , summary="Get all products" , description="Retrieve a list of all products in the database.")
 def get_all_product( db: Session = Depends(get_db) ,  _: str = Depends(verify_api_key)):
     db_products = db.query(database_model.Product).all() 
-    return db_products
+    return [
+        productResponse(
+            product_id= row.id,
+            product_name= row.name,
+            quantity= row.quantity,
+            quantity_unit = row.quantity_unit ,
+            original_price_per_unit= row.original_price_per_unit,
+            currency = "USD",
+            discounted_percentage_per_unit= row.discount_percentage_per_unit , 
+            discounted_price_per_unit= row.discounted_price_per_unit
+             )
+        for row in db_products
+    ]
 
+
+#get products by id
 @app.get("/product/{id}" , tags=["Products"] , summary="Get product by ID" , description="Retrieve a product by its ID.")
 def get_product_by_id(id:int , db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id == id).first()
     if db_product:
-        return db_product
+        return [
+            productResponse(
+                product_id= db_product.id,
+                product_name = db_product.name ,
+                quantity= db_product.quantity, 
+                quantity_unit = db_product.quantity_unit ,
+                original_price_per_unit= db_product.original_price_per_unit,
+                currency = "USD",
+                discounted_percentage_per_unit= db_product.discount_percentage_per_unit,
+                discounted_price_per_unit= db_product.discounted_price_per_unit 
+            ) 
+        ]
+               
     return {"message": "Product not found!"}
 
+
+#post products in db
 @app.post("/products/" , tags=["Products"] , summary="Add new product" , description="Add a new product to the database.")
 def add_product(product: Product, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     product_data = product.model_dump()
-    product_data["discounted_price "] = (product.original_price - (product.original_price * product.discount_percentage / 100 ))
-    db.add(database_model.Product(**product.model_dump()))
+    product_data["discounted_price_per_unit"] = (product.original_price_per_unit - (product.original_price_per_unit * product.discount_percentage_per_unit / 100 ))
+    db.add(database_model.Product(**product_data))
     db.commit()
     return {"message": "Product added successfully!"}
 
+#update product in db 
 @app.put("/products/{id}" , tags=["Products"] , summary="Update product" , description="Update an existing product in the database.")
 def update_product(id:int , product: Product, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id == id).first()
     if db_product:
        db_product.name = product.name
-       db_product.original_price  = product.original_price 
+       db_product.original_price  = product.original_price_per_unit
        db_product.quantity = product.quantity
+       db_product.quantity_unit = product.quantity_unit
        db.commit()
-       return {"message": "Product updated successfully!"}
+       return {"message": "Product updated successfully!"  ,
+               "Product_id" : db_product.id}
     else:
         return {"message": "Product not found!"}
 
+
+#delete product in db 
 @app.delete("/products/{id}" , tags=["Products"] , summary="Delete product" , description="Delete a product from the database by its ID.")
 def delete_product(id:int, db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id == id).first()
     if db_product:
         db.delete(db_product)
         db.commit()
-        return {"message": "Product deleted successfully!"}
+        return {"message": "Product deleted successfully!",
+                "product id " : db_product.id}
     return {"message": "Product not found!"}
 
+
+#get customers
 @app.get("/customers/" , tags=["Customers"] , summary="Get all customers" , description="Retrieve a list of all customers in the database.")
 def get_all_customers(db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
-    return db.query(database_model.Customer).all()
+    customers =  db.query(database_model.Customer).all()
     
+    return [
+        customerResponse(
+            customer_id= row.customer_id,
+            customer_name= row.name,
+            mobile_number = row.mobile_number , 
+            email = row.email ,
+            address = row.address ,
+            created_at =  row.created_at ,
+            updated_at = row.updated_at
+
+             )
+        for row in customers
+    ]
+   
+   
+#get customer by id  
 @app.get("/customer/{id}" , tags=["Customers"] , summary="Get customer by ID" , description="Retrieve a customer by their ID.")
 def get_customer_by_id(id:int , db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     db_customer = db.query(database_model.Customer).filter(database_model.Customer.customer_id == id).first()
     if db_customer:
-        return db_customer
+        return [
+            customerResponse(
+                customer_id= db_customer.customer_id,
+                customer_name= db_customer.name,
+                 mobile_number = db_customer.mobile_number , 
+                email = db_customer.email ,
+                address = db_customer.address ,
+                created_at =  db_customer.created_at ,
+                updated_at = db_customer.updated_at
+                
+            )
+        ]
     return {"message": "Customer not found!"}
 
+#register a customer in a database
 @app.post("/customers/" , tags=["Customers"] , summary="Add new customer" , description="Add a new customer to the database.")
 def add_customer(customer: Customer, db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
-    db.add(database_model.Customer(**customer.model_dump()))
-    db.commit()
-    return {"message": "Customer added successfully!"}
-
-@app.post("/orders/" , tags=["Orders"] , summary="Create new order" , description="Create a new order in the database.")
-def create_order(order: Order , db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
-    customer = db.query(database_model.Customer).filter(database_model.Customer.customer_id == order.customer_id).first()
-    if customer is None:
-        return {"message": "Customer not found!"}
-    
-    db_order = database_model.Order(customer_id = order.customer_id , created_at = datetime.utcnow())
-    
+    db_order= database_model.Customer(**customer.model_dump())
     db.add(db_order)
-    db.flush()
-    
-    for item in order.item:
-        product = db.query(database_model.Product ).filter(database_model.Product.id == item.product_id).first()
-        
-        if product is None:
-            db.rollback()
-            return {"message": f"Product with id {item.product_id} not found!"}
-        
-        if product.quantity < item.quantity:
-            db.rollback()
-            return {"message": f"Insufficient quantity for product {product.name}!"}
-        
-        db_order_item = database_model.OrderItem(order_id = db_order.order_id , product_id = item.product_id, quantity = item.quantity)
-        
-        db.add(db_order_item)
-        product.quantity -= item.quantity
-        
     db.commit()
-    return {"message": "Order created successfully!"}
+    return {"message": "Customer added successfully!" , 
+            "customer_id" : db_order.customer_id}
 
+#update a existing customer 
+@app.put("/customers/{id}" , tags= ["Customers"] , summary= "update the customer values " , description="update a existing customer in a database")
+def update_customer (id:  int ,customer : Customer , db : Session = Depends(get_db) , _: str = Depends(verify_api_key)):
+    db_customer = db.query(database_model.Customer).filter(database_model.Customer.customer_id == id ).first()
+    if db_customer:
+        db_customer.name = customer.name,
+        db_customer.email = customer.email,
+        db_customer.mobile_number = customer.mobile_number,
+        db_customer.address = customer.mobile_number
+        
+        db.commit()
+        
+        return {"message" : f"Customer {db_customer.customer_id} updated successfully !" ,}
+    return {"message": "Customer not found!"}
+
+#delete customer by id 
+@app.delete("/customers/{id}" , tags= ["Customers"] , summary= "delete customer" , description="deleting a existing customer by id ")
+def delete_customer(
+    id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key)
+):
+    try:
+        db_customer = (
+            db.query(database_model.Customer)
+            .filter(database_model.Customer.customer_id == id)
+            .first()
+        )
+
+        if not db_customer:
+            raise HTTPException(
+                status_code=404,
+                detail="Customer not found"
+            )
+
+        orders = (
+            db.query(database_model.Order)
+            .filter(database_model.Order.customer_id == id)
+            .all()
+        )
+
+        for order in orders:
+
+            db.query(database_model.OrderItem).filter(
+                database_model.OrderItem.order_id == order.order_id
+            ).delete()
+
+            db.delete(order)
+
+        db.delete(db_customer)
+
+        db.commit()
+
+        return {
+            "message": f"Customer {id} deleted successfully!"
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+    
+    
+#create  a order
+@app.post(
+    "/orders/",
+    tags=["Orders"],
+    summary="Create new order",
+    description="Create a new order in the database."
+)
+def create_order(order: Order,db: Session = Depends(get_db),_: str = Depends(verify_api_key)):
+    try:
+
+        customer = (
+            db.query(database_model.Customer)
+            .filter(database_model.Customer.customer_id == order.customer_id)
+            .first()
+        )
+
+        if customer is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Customer not found!"
+            )
+
+        total_price = 0
+
+        # Store validated products so we don't query them twice
+        validated_items = []
+
+        # Validate products and calculate total
+        for item in order.item:
+
+            product = (
+                db.query(database_model.Product)
+                .filter(database_model.Product.id == item.product_id)
+                .first()
+            )
+
+            if product is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Product with id {item.product_id} not found!"
+                )
+
+            if product.quantity < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient quantity for product {product.name}!"
+                )
+
+            total_price += calculate_total_price(product, item.quantity)
+
+            validated_items.append((product, item))
+
+        # Create order with calculated total
+        db_order = database_model.Order(
+            customer_id=order.customer_id,
+            total_price=total_price,
+            created_at=datetime.utcnow()
+        )
+
+        db.add(db_order)
+
+        # Generates the UUID without committing
+        db.flush()
+
+        # Create order items and update stock
+        for product, item in validated_items:
+
+            db_order_item = database_model.OrderItem(
+                order_id=db_order.order_id,
+                product_id=item.product_id,
+                quantity=item.quantity
+            )
+
+            db.add(db_order_item)
+
+            product.quantity -= item.quantity
+
+        db.commit()
+
+        db.refresh(db_order)
+
+        return {
+            "message": "Order created successfully!",
+            "order_id": db_order.order_id,
+            "total_price": db_order.total_price,
+            "currency": "USD"
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+
+#get all orders in db
 @app.get("/orders/" , tags=["Orders"] , summary="Get all orders" , description="Retrieve a list of all orders in the database.")
 def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
    rows = (db.query(
@@ -185,9 +381,11 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
         database_model.Order.updated_at ,
         database_model.Product.name,
         database_model.Product.id,
-         database_model.Order.order_id,
+        database_model.Order.order_id,
+        database_model.Order.total_price ,
         database_model.OrderItem.order_item_id,
-        database_model.OrderItem.quantity
+        database_model.OrderItem.quantity ,
+        database_model.Product.quantity_unit
     )
     .join(
         database_model.OrderItem,
@@ -211,6 +409,8 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
                 customer_id=row.customer_id,
                 order_id=row.order_id,
                 order_date=row.created_at,
+                total_price = row.total_price ,
+                currency = "USD" ,
                 item=[]
             )
 
@@ -220,13 +420,16 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
                 product_id=row.id,
                 product_name=row.name,
                 order_item_id=row.order_item_id,
-                product_quantity=row.quantity
+                product_quantity=row.quantity,
+                product_quantity_unit = row.quantity_unit
             )
 
         )
 
    return list(orders.values())
 
+
+#get a specific order by id 
 @app.get("/order/{id}" , tags=["Orders"])
 def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
         db_order = db.query( database_model.Order.customer_id,
@@ -236,7 +439,9 @@ def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(v
             database_model.Order.order_id,
             database_model.Order.created_at,
             database_model.OrderItem.order_item_id,
-            database_model.OrderItem.quantity
+            database_model.OrderItem.quantity,
+            database_model.Order.total_price ,
+            database_model.Product.quantity_unit
         ).join(
             database_model.OrderItem,
             database_model.Order.order_id == database_model.OrderItem.order_id
@@ -249,15 +454,113 @@ def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(v
                 customer_id=db_order[0].customer_id,
                 order_id=db_order[0].order_id,
                 order_date=db_order[0].created_at,
+                total_price = db_order[0].total_price,
+                currency = "USD" ,
                 item = [
                     OrderItemResponse(
                         product_id = row.id,
                         product_name = row.name ,
                         order_item_id = row.order_item_id ,
-                        product_quantity= row.quantity
+                        product_quantity= row.quantity ,
+                        product_quantity_unit = row.quantity_unit
                     )
                     for row in db_order
                 ]
             )
       
         return {"message": "Order not found!"}
+    
+#update a an existing order by id 
+@app.put("/orders/{id}" , tags= ["Orders"] , summary="update an order " , description= "update an existing order by id")
+def update_order(id: UUID , order:orderUpdate , db: Session = Depends(get_db), _: str = Depends(verify_api_key) ):
+     
+    try: 
+     db_order = db.query(database_model.Order).filter(database_model.Order.order_id == id).first()
+     
+     if not db_order:
+           return {"message " : f"order {id} does not exist "}
+       
+     total_price = 0  
+     for item in db_order.order_items:
+
+            product = (
+                db.query(database_model.Product)
+                .filter(database_model.Product.id == item.product_id)
+                .first()
+            )
+
+            product.quantity += item.quantity
+
+
+     db.query(database_model.OrderItem).filter(
+            database_model.OrderItem.order_id == id
+        ).delete()
+       
+     for item in order.items:
+
+            product = (
+                db.query(database_model.Product)
+                .filter(database_model.Product.id == item.product_id)
+                .first()
+            )
+
+            if not product:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Product {item.product_id} not found"
+                )
+
+            if product.quantity < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient stock for {product.name}"
+                )
+
+            product.quantity -= item.quantity
+
+            db.add(
+                database_model.OrderItem(
+                    order_id=id,
+                    product_id=item.product_id,
+                    quantity=item.quantity,
+                )
+            )
+    
+     
+     total_price += (
+        product.discounted_price_per_unit * item.quantity
+    )
+     db_order.total_price = total_price
+     db.commit()
+
+     return {
+            "message": f"Order {id} updated successfully"
+        }
+    except:
+        db.rollback()
+        raise
+
+
+#delete order by id 
+@app.delete ("/orders/{id}" , tags= ["Orders"] , summary= "deleting a order" , description = "deleting a existing customer by id")
+def delete_order (id : UUID , db: Session = Depends(get_db), _:str  = Depends(verify_api_key) ):
+    
+   try : 
+    db_order = db.query(database_model.Order).filter(database_model.Order.order_id == id).first()
+     
+    if not db_order:
+           return {"message " : f"order {id} does not exist "}
+       
+   
+            
+    db.query(database_model.OrderItem).filter(
+            database_model.OrderItem.order_id == id
+        ).delete()
+    
+    db.delete(db_order)
+            
+    db.commit()
+    return {"message " : f"order {id} deleted Successfully !"}
+   except:
+       db.rollback
+       raise    

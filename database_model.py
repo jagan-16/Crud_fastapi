@@ -28,10 +28,11 @@ class Product(base , TimestampMixin):
     
     id = Column (Integer, primary_key = True , index = True)
     name = Column (String , nullable = False)
-    original_price = Column (Float , nullable = False)
-    quantity = Column (Integer , nullable = False)
-    discount_percentage = Column(Float, nullable= True)
-    discounted_price = Column (Float, nullable= True )
+    quantity = Column (Float , nullable = False)
+    quantity_unit = Column (String , nullable = False)
+    original_price_per_unit = Column (Float , nullable = False)
+    discount_percentage_per_unit = Column(Float, nullable= True)
+    discounted_price_per_unit = Column (Float, nullable= True )
     
     
 
@@ -68,6 +69,8 @@ class Order(base ,TimestampMixin):
     
     customer_id = Column(Integer,
                         ForeignKey("customers.customer_id"))
+    
+    total_price = Column(Float , nullable= False)
     
     
     customer = relationship(
