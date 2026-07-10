@@ -7,8 +7,9 @@ from database import session, engine
 import database_model
 from sqlalchemy.orm import Session
 from fastapi.security import APIKeyHeader
-from fastapi import Security, HTTPException
+from fastapi import Security, HTTPException ,Query
 import os
+import math
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -94,10 +95,27 @@ def calculate_total_price(product, quantity):
     return product.discounted_price_per_unit * quantity
 
 #get products
-@app.get("/products/" , tags=["Products"] , summary="Get all products" , description="Retrieve a list of all products in the database.")
-def get_all_product( db: Session = Depends(get_db) ,  _: str = Depends(verify_api_key)):
-    db_products = db.query(database_model.Product).all() 
-    return [
+@app.get("/products/" ,  tags=["Products"] , summary="Get all products" , description="Retrieve a list of all products in the database.")
+def get_all_product( db: Session = Depends(get_db) , page: int = Query(1, ge=1),limit: int = Query(2, ge=1, le=100), _: str = Depends(verify_api_key)):
+    
+    offset = (page - 1) * limit
+    total_records = db.query(database_model.Product).count()
+
+    total_pages = math.ceil(total_records / limit)
+    
+    
+    db_products = (db.query(database_model.Product)
+                   .offset(offset)
+                   .limit(limit)
+                   .all() )
+    return {
+         "page": page,
+    "limit": limit,
+    "total_records": total_records,
+    "total_pages": total_pages,
+    "has_next": page < total_pages,
+    "has_previous": page > 1,
+    "data": [
         productResponse(
             product_id= row.id,
             product_name= row.name,
@@ -110,7 +128,7 @@ def get_all_product( db: Session = Depends(get_db) ,  _: str = Depends(verify_ap
              )
         for row in db_products
     ]
-
+    }
 
 #get products by id
 @app.get("/product/{id}" , tags=["Products"] , summary="Get product by ID" , description="Retrieve a product by its ID.")
@@ -172,10 +190,27 @@ def delete_product(id:int, db: Session = Depends(get_db) , _: str = Depends(veri
 
 #get customers
 @app.get("/customers/" , tags=["Customers"] , summary="Get all customers" , description="Retrieve a list of all customers in the database.")
-def get_all_customers(db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
-    customers =  db.query(database_model.Customer).all()
+def get_all_customers(db: Session = Depends(get_db) ,page : int = Query(1 , ge = 1) , limit: int = Query(2, ge=1, le=100) , _: str = Depends(verify_api_key)):
     
-    return [
+    offset = (page - 1) * limit
+    
+    total_count = db.query(database_model.Customer).count()
+    
+    total_pages = math.ceil(total_count / limit)
+    
+    customers = ( db.query(database_model.Customer)
+                 .offset(offset)
+                 .limit(limit)
+                 .all())
+    
+    return {
+         "page": page,
+    "limit": limit,
+    "total_records": total_count,
+    "total_pages": total_pages,
+    "has_next": page < total_pages,
+    "has_previous": page > 1,
+    "data": [
         customerResponse(
             customer_id= row.customer_id,
             customer_name= row.name,
@@ -188,7 +223,7 @@ def get_all_customers(db: Session = Depends(get_db) , _: str = Depends(verify_ap
              )
         for row in customers
     ]
-   
+    }
    
 #get customer by id  
 @app.get("/customer/{id}" , tags=["Customers"] , summary="Get customer by ID" , description="Retrieve a customer by their ID.")
@@ -372,36 +407,82 @@ def create_order(order: Order,db: Session = Depends(get_db),_: str = Depends(ver
         db.rollback()
         raise
 
-#get all orders in db
-@app.get("/orders/" , tags=["Orders"] , summary="Get all orders" , description="Retrieve a list of all orders in the database.")
-def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
-   rows = (db.query(
-        database_model.Order.customer_id,
-        database_model.Order.created_at,
-        database_model.Order.updated_at ,
-        database_model.Product.name,
-        database_model.Product.id,
-        database_model.Order.order_id,
-        database_model.Order.total_price ,
-        database_model.OrderItem.order_item_id,
-        database_model.OrderItem.quantity ,
-        database_model.Product.quantity_unit
-    )
-    .join(
-        database_model.OrderItem,
-        database_model.Order.order_id == database_model.OrderItem.order_id
-    )
-    .join(
-        database_model.Product,
-        database_model.OrderItem.product_id == database_model.Product.id
-    )
-    .all()
-)
-    
-   
-   orders = {}
+import math
+from fastapi import Query
 
-   for row in rows:
+@app.get(
+    "/orders/",
+    tags=["Orders"],
+    summary="Get all orders",
+    description="Retrieve a paginated list of all orders."
+)
+def get_all_orders(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    limit: int = Query(2, ge=1, le=100),
+    _: str = Depends(verify_api_key)
+):
+
+    offset = (page - 1) * limit
+
+    # Total number of orders
+    total_count = db.query(database_model.Order).count()
+
+    total_pages = math.ceil(total_count / limit)
+
+    # Fetch only the orders for this page
+    paginated_orders = (
+        db.query(database_model.Order)
+        .order_by(database_model.Order.created_at)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    if not paginated_orders:
+        return {
+            "page": page,
+            "limit": limit,
+            "total_records": total_count,
+            "total_pages": total_pages,
+            "has_next": False,
+            "has_previous": page > 1,
+            "data": []
+        }
+
+    order_ids = [order.order_id for order in paginated_orders]
+
+    # Fetch every item belonging to the paginated orders
+    rows = (
+        db.query(
+            database_model.Order.customer_id,
+            database_model.Order.created_at,
+            database_model.Order.updated_at,
+            database_model.Order.order_id,
+            database_model.Order.total_price,
+
+            database_model.Product.id,
+            database_model.Product.name,
+            database_model.Product.quantity_unit,
+
+            database_model.OrderItem.order_item_id,
+            database_model.OrderItem.quantity,
+        )
+        .join(
+            database_model.OrderItem,
+            database_model.Order.order_id == database_model.OrderItem.order_id
+        )
+        .join(
+            database_model.Product,
+            database_model.OrderItem.product_id == database_model.Product.id
+        )
+        .filter(database_model.Order.order_id.in_(order_ids))
+        .all()
+    )
+
+    orders = {}
+
+    for row in rows:
 
         if row.order_id not in orders:
 
@@ -409,8 +490,8 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
                 customer_id=row.customer_id,
                 order_id=row.order_id,
                 order_date=row.created_at,
-                total_price = row.total_price ,
-                currency = "USD" ,
+                total_price=row.total_price,
+                currency="USD",
                 item=[]
             )
 
@@ -421,14 +502,20 @@ def get_all_orders(db: Session = Depends(get_db) , _: str = Depends(verify_api_k
                 product_name=row.name,
                 order_item_id=row.order_item_id,
                 product_quantity=row.quantity,
-                product_quantity_unit = row.quantity_unit
+                product_quantity_unit=row.quantity_unit
             )
 
         )
 
-   return list(orders.values())
-
-
+    return {
+        "page": page,
+        "limit": limit,
+        "total_records": total_count,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_previous": page > 1,
+        "data": list(orders.values())
+    }
 #get a specific order by id 
 @app.get("/order/{id}" , tags=["Orders"])
 def get_order_by_id(id: UUID, db: Session = Depends(get_db) , _: str = Depends(verify_api_key)):
