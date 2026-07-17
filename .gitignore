@@ -6,7 +6,7 @@ __pycache__/
 
 
 frontend/
-
+test/
 node_modules/
 # Environment
 .env

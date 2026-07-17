@@ -64,3 +64,9 @@ class OrderResponse(BaseModel):
         total_price: float
         currency: str
         item: list[OrderItemResponse]
+        
+class SummarizeRequest(BaseModel):
+        text : str 
+        
+class SummarizeResponse(BaseModel):
+        summary : str
