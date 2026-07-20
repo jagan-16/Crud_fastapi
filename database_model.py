@@ -3,7 +3,7 @@ from sqlalchemy import Column ,Integer, Sequence , String , Float ,ForeignKey , 
 import uuid 
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime , Text
 from datetime import datetime
 
 base = declarative_base()
@@ -112,3 +112,44 @@ class OrderItem(base , TimestampMixin):
         "Order",
         back_populates = "order_items"
     )
+    
+class conversation(base , TimestampMixin):
+        
+        __tablename__ = "conversations"
+        
+        id      = Column( UUID(as_uuid=True) , 
+                         primary_key= True ,
+                         default= uuid.uuid4 , 
+                         index= True
+                        )        
+        conversation_type  = Column ( String , 
+                                    nullable= False
+                                    )
+        message = relationship(
+            "message" , 
+            back_populates= "conversation"
+        )
+       
+class message(base ,TimestampMixin ):
+        
+        __tablename__ =  "messages"
+        
+        id  = Column (UUID(as_uuid=True),
+                      primary_key=True ,
+                      default= uuid.uuid4 ,
+                      index= True
+                      )
+        conversation_id =  Column(UUID(as_uuid=True),
+                                  ForeignKey("conversations.id")
+                                  )
+        role           = Column(String , 
+                                nullable= False
+                                )  
+        content     = Column(Text , 
+                             nullable= False
+                             )   
+        
+        conversation = relationship(
+            "conversation" ,
+            back_populates= "message"
+        )  

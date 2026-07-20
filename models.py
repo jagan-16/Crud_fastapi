@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
+from typing import Optional
 
 class Product(BaseModel):
         name:str
@@ -69,4 +70,24 @@ class SummarizeRequest(BaseModel):
         text : str 
         
 class SummarizeResponse(BaseModel):
+        conversation_id : UUID
         summary : str
+        
+class AnswerResponse(BaseModel):
+        conversation_id : UUID
+        answer: str
+        
+class MessageResponse(BaseModel):
+    id: UUID
+    role: str
+    content: str
+    created_at: datetime
+    
+class MessageListResponse(BaseModel):
+    page: int
+    limit: int
+    total_records: int
+    total_pages: int
+    has_next: bool
+    has_previous: bool
+    messages: list[MessageResponse]
